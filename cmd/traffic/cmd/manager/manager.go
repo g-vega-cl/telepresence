@@ -8,6 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"k8s.io/client-go/kubernetes"
@@ -22,6 +28,37 @@ import (
 	"github.com/telepresenceio/telepresence/v2/pkg/k8sapi"
 	"github.com/telepresenceio/telepresence/v2/pkg/version"
 )
+
+func setupTracer() (func(context.Context), error) {
+	if url, ok := os.LookupEnv("OTEL_EXPORTER_JAEGER_ENDPOINT"); ok {
+		// Create the Jaeger exporter
+		exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(url)))
+		if err != nil {
+			return func(context.Context) {}, err
+		}
+		tp := trace.NewTracerProvider(
+			// Always be sure to batch in production.
+			trace.WithBatcher(exp),
+			trace.WithSampler(trace.AlwaysSample()),
+			// Record information about this application in a Resource.
+			trace.WithResource(resource.NewWithAttributes(
+				semconv.SchemaURL,
+				semconv.ServiceNameKey.String("traffic-manager"),
+				attribute.Int64("ID", 1),
+			)),
+		)
+		otel.SetTracerProvider(tp)
+		return func(ctx context.Context) {
+			ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+			defer cancel()
+			if err := tp.Shutdown(ctx); err != nil {
+				dlog.Error(ctx, "error shutting down tracer: ", err)
+			}
+		}, nil
+	}
+
+	return func(context.Context) {}, nil
+}
 
 // Main starts up the traffic manager and blocks until it ends
 func Main(ctx context.Context, _ ...string) error {
@@ -40,6 +77,11 @@ func Main(ctx context.Context, _ ...string) error {
 	if err != nil {
 		return fmt.Errorf("unable to create the Kubernetes Interface from InClusterConfig: %w", err)
 	}
+	cleanup, err := setupTracer()
+	if err != nil {
+		return err
+	}
+	defer cleanup(ctx)
 	ctx = k8sapi.WithK8sInterface(ctx, ki)
 	mgr, ctx, err := NewManager(ctx)
 	if err != nil {

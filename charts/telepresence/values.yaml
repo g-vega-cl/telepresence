@@ -15,11 +15,11 @@
 # The client will default to docker.io/datawire/tel2:{{CLIENT_VERSION}}
 
 image:
-  registry: docker.io/datawire
+  registry: docker.io/j14a
   name: tel2
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "2.6.8-29-gce77f4539-1656015110"
 
   imagePullSecrets: []
 
@@ -171,9 +171,9 @@ managerRbac:
 agentInjector:
   name: agent-injector
   agentImage:
-    registry: docker.io/datawire
-    name: ""
-    tag: ""
+    registry: docker.io/j14a
+    name: "tel2"
+    tag: "2.6.8-29-gce77f4539-1656015110"
   service:
     type: ClusterIP
     ports:
@@ -203,6 +203,14 @@ telepresenceAPI:
   # The port on agent's localhost where the API service can be found
   # Default: 0
   port: 0
+
+
+################################################################################
+## Tracing configuration
+################################################################################
+tracing:
+  host: "http://simplest-collector.ambassador"
+  port: "14268"
 
 ################################################################################
 ## User Configuration

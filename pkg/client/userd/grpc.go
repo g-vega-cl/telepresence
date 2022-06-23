@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc/codes"
 	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -212,6 +213,8 @@ func (s *service) scoutInterceptEntries(spec *manager.InterceptSpec, result *rpc
 }
 
 func (s *service) CanIntercept(c context.Context, ir *rpc.CreateInterceptRequest) (result *rpc.InterceptResult, err error) {
+	c, span := otel.Tracer("userd-grpc").Start(c, "can-intercept")
+	defer span.End()
 	defer func() {
 		entries, ok := s.scoutInterceptEntries(ir.GetSpec(), result, err)
 		var action string
@@ -233,6 +236,8 @@ func (s *service) CanIntercept(c context.Context, ir *rpc.CreateInterceptRequest
 }
 
 func (s *service) CreateIntercept(c context.Context, ir *rpc.CreateInterceptRequest) (result *rpc.InterceptResult, err error) {
+	c, span := otel.Tracer("userd-grpc").Start(c, "create-intercept")
+	defer span.End()
 	defer func() {
 		entries, ok := s.scoutInterceptEntries(ir.GetSpec(), result, err)
 		var action string

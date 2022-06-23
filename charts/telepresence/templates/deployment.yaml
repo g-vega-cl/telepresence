@@ -53,6 +53,10 @@ spec:
             value: {{ .Values.systemaPort | quote }}
           - name: TELEPRESENCE_REGISTRY
             value: {{ .Values.agentInjector.agentImage.registry }}
+          {{- with .Values.tracing }}
+          - name: OTEL_EXPORTER_JAEGER_ENDPOINT
+            value: "{{ .host }}:{{ .port }}/api/traces"
+          {{- end }}
           {{- with .Values.telepresenceAPI }}
           {{- if .port }}
           - name: TELEPRESENCE_API_PORT

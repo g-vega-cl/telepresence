@@ -34,6 +34,7 @@ type k8sPortForwardDialer struct {
 	k8sInterface  kubernetes.Interface
 	spdyTransport http.RoundTripper
 	spdyUpgrader  spdy.Upgrader
+	defaultKind   string
 
 	// state
 	nextRequestID int64
@@ -45,7 +46,7 @@ type k8sPortForwardDialer struct {
 // grpc.WithContextDialer) that dials to a port on a Kubernetes Pod, in the manor of `kubectl
 // port-forward`.  It returns the direct connection to the apiserver; it does not establish a local
 // port being forwarded from or otherwise pump data over the connection.
-func NewK8sPortForwardDialer(logCtx context.Context, kubeConfig *rest.Config, k8sInterface kubernetes.Interface) (func(context.Context, string) (net.Conn, error), error) {
+func NewK8sPortForwardDialer(logCtx context.Context, kubeConfig *rest.Config, k8sInterface kubernetes.Interface, defaultKind string) (func(context.Context, string) (net.Conn, error), error) {
 	if err := setKubernetesDefaults(kubeConfig); err != nil {
 		return nil, err
 	}
@@ -58,6 +59,7 @@ func NewK8sPortForwardDialer(logCtx context.Context, kubeConfig *rest.Config, k8
 		k8sInterface:  k8sInterface,
 		spdyTransport: spdyTransport,
 		spdyUpgrader:  spdyUpgrader,
+		defaultKind:   defaultKind,
 
 		spdyStreams: make(map[string]httpstream.Connection),
 	}
@@ -91,7 +93,7 @@ func (pf *k8sPortForwardDialer) resolve(ctx context.Context, addr string) (pod *
 
 	var objKind, objQName string
 	if slash := strings.Index(hostName, "/"); slash < 0 {
-		objKind = "Pod."
+		objKind = pf.defaultKind
 		objQName = hostName
 	} else {
 		objKind = hostName[:slash]

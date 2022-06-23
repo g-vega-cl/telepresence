@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/user"
@@ -15,6 +16,12 @@ import (
 
 	"github.com/blang/semver"
 	stacktrace "github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -211,6 +218,17 @@ func NewSession(c context.Context, sr *scout.Reporter, cr *rpc.ConnectRequest, s
 		Value: len(cr.MappedNamespaces),
 	})
 
+	cleanup, err := startTracer(c, cluster)
+	if err != nil {
+		dlog.Errorf(c, "unable to start tracer: %+v", err)
+		return nil, connectError(rpc.ConnectInfo_DAEMON_FAILED, err)
+	}
+	// Cleanup the tracer whenever we're finished
+	go func() {
+		<-c.Done()
+		cleanup(context.Background())
+	}()
+
 	connectStart := time.Now()
 
 	dlog.Info(c, "Connecting to traffic manager...")
@@ -302,6 +320,47 @@ func (tm *TrafficManager) ManagerClient() manager.ManagerClient {
 	return tm.managerClient
 }
 
+const tracingEndpoint = "http://simplest-collector.ambassador:14268/api/traces"
+
+func startTracer(ctx context.Context, cluster *k8s.Cluster) (func(context.Context), error) {
+	dialer, err := dnet.NewK8sPortForwardDialer(ctx, cluster.Config.RestConfig, k8sapi.GetK8sInterface(ctx), "svc")
+	if err != nil {
+		return nil, err
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, address string) (net.Conn, error) {
+				return dialer(ctx, address)
+			},
+		},
+	}
+	exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(tracingEndpoint), jaeger.WithHTTPClient(client)))
+
+	if err != nil {
+		return nil, err
+	}
+	tp := trace.NewTracerProvider(
+		// Always be sure to batch in production.
+		trace.WithBatcher(exp),
+		trace.WithSampler(trace.AlwaysSample()),
+		// Record information about this application in a Resource.
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("user-daemon"),
+			attribute.Int64("ID", 2),
+		)),
+	)
+	otel.SetTracerProvider(tp)
+	return func(ctx context.Context) {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+		defer cancel()
+		if err := tp.Shutdown(ctx); err != nil {
+			dlog.Error(ctx, "error shutting down tracer: ", err)
+		}
+	}, nil
+
+}
+
 // connectCluster returns a configured cluster instance
 func connectCluster(c context.Context, cr *rpc.ConnectRequest) (*k8s.Cluster, error) {
 	config, err := k8s.NewConfig(c, cr.KubeFlags)
@@ -358,7 +417,7 @@ func connectMgr(c context.Context, cluster *k8s.Cluster, installID string, svc S
 	}
 
 	dlog.Debug(c, "traffic-manager started, creating port-forward")
-	grpcDialer, err := dnet.NewK8sPortForwardDialer(c, cluster.Config.RestConfig, k8sapi.GetK8sInterface(c))
+	grpcDialer, err := dnet.NewK8sPortForwardDialer(c, cluster.Config.RestConfig, k8sapi.GetK8sInterface(c), "svc")
 	if err != nil {
 		return nil, err
 	}
