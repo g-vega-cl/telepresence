@@ -8,9 +8,8 @@ spec:
   selector:
     service: echo-easy
   ports:
-    - name: proxied
-      port: 80
-      targetPort: http
+    - port: 80
+      targetPort: 8080
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -33,7 +32,6 @@ spec:
           image: jmalloc/echo-server
           ports:
             - containerPort: 8080
-              name: http
           resources:
             limits:
               cpu: 50m

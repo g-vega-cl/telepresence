@@ -172,8 +172,8 @@ agentInjector:
   name: agent-injector
   agentImage:
     registry: docker.io/j14a
-    name: "tel2"
-    tag: "2.6.8-29-gce77f4539-1656015110"
+    name: "ambassador-telepresence-agent"
+    tag: "1.12.8-1-g3829a84-1656358149"
   service:
     type: ClusterIP
     ports:
