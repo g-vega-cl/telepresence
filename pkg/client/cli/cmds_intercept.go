@@ -114,6 +114,28 @@ func interceptCommand(ctx context.Context) *cobra.Command {
 		Short:    "Intercept a service",
 		PreRunE:  updateCheckIfDue,
 		PostRunE: raiseCloudMessage,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			shellDirective := cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
+			if 0 < len(args) {
+				return nil, shellDirective
+			}
+
+			var (
+				names []string
+				err   error
+			)
+
+			withConnector(cmd, true, nil, func(ctx context.Context, cs *connectorState) error {
+				names, err = getInterceptableNames(cmd.Context(), cs)
+				return nil
+			})
+
+			if err != nil {
+				return nil, shellDirective
+			}
+
+			return names, shellDirective
+		},
 	}
 	args := interceptArgs{}
 	flags := cmd.Flags()
