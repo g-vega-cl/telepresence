@@ -15,6 +15,7 @@ import (
 	"github.com/datawire/dlib/dgroup"
 	"github.com/datawire/dlib/dlog"
 	rpc "github.com/telepresenceio/telepresence/rpc/v2/manager"
+	"github.com/telepresenceio/telepresence/v2/cmd/traffic/cmd/manager/managerutil"
 	"github.com/telepresenceio/telepresence/v2/pkg/agentconfig"
 	"github.com/telepresenceio/telepresence/v2/pkg/dos"
 	"github.com/telepresenceio/telepresence/v2/pkg/forwarder"
@@ -118,6 +119,12 @@ func Main(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
+
+	cleanup, err := managerutil.SetupTracer(2, "traffic-agent")
+	if err != nil {
+		return fmt.Errorf("failed to set up tracer: %w", err)
+	}
+	defer cleanup(ctx)
 
 	info := &rpc.AgentInfo{
 		Name:      config.AgentConfig().AgentName,

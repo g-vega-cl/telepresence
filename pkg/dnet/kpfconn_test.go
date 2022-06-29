@@ -155,7 +155,7 @@ func TestKubectlPortForward(t *testing.T) {
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		dial, err := dnet.NewK8sPortForwardDialer(ctx, kubeConfig, ki)
+		dial, err := dnet.NewK8sPortForwardDialer(ctx, kubeConfig, ki, "pod")
 		if err != nil {
 			return nil, nil, nil, err
 		}

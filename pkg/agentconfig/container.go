@@ -1,6 +1,7 @@
 package agentconfig
 
 import (
+	"os"
 	"strconv"
 	"strings"
 
@@ -36,6 +37,12 @@ func AgentContainer(
 		evs = append(evs, core.EnvVar{
 			Name:  EnvAPIPort,
 			Value: strconv.Itoa(int(config.APIPort)),
+		})
+	}
+	if url, ok := os.LookupEnv("OTEL_EXPORTER_JAEGER_ENDPOINT"); ok {
+		evs = append(evs, core.EnvVar{
+			Name:  "OTEL_EXPORTER_JAEGER_ENDPOINT",
+			Value: url,
 		})
 	}
 	evs = append(evs,

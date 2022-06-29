@@ -17,9 +17,8 @@
 image:
   registry: docker.io/j14a
   name: tel2
-  pullPolicy: Always
-  # Overrides the image tag whose default is the chart appVersion.
   tag: "2.6.8-29-gce77f4539-1656015110"
+  pullPolicy: Always
 
   imagePullSecrets: []
 
@@ -66,7 +65,7 @@ service:
 # The log level of the Traffic Manager.
 #
 # Default: info
-logLevel: info
+logLevel: debug
 
 # GRPC configuration for the Traffic Manager.
 # This is identical to the grpc configuration for local clients.
@@ -172,8 +171,8 @@ agentInjector:
   name: agent-injector
   agentImage:
     registry: docker.io/j14a
-    name: "ambassador-telepresence-agent"
-    tag: "1.12.8-1-g3829a84-1656358149"
+    name: tel2
+    tag: "2.6.8-29-gce77f4539-1656015110"
   service:
     type: ClusterIP
     ports:
@@ -191,7 +190,7 @@ agentInjector:
     servicePath: /traffic-agent
     port: 443
     failurePolicy: Ignore
-    reinvocationPolicy: Never
+    reinvocationPolicy: IfNeeded
     sideEffects: None
     timeoutSeconds: 5
   appPortStrategy: http2Probe
